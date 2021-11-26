@@ -1,0 +1,395 @@
+import matplotlib.pyplot as plt
+import random
+import numpy as np
+import time
+
+def plot_world(world, stone_list, start_position, final_position, result=None):
+    plt.figure(figsize=(8.4 / 2.54, 8.4 / 2.54), dpi=600)
+
+    plt.ylim([-1, len(world)])
+    plt.xlim([-1, len(world)])
+    x = range(0, len(world) + 1, 5)
+
+    plt.xticks(x)  # 横坐标
+    plt.yticks(x)  # 纵坐标
+
+    plt.scatter(start_position[0], start_position[1], s=30, color="green", marker="o")
+    plt.scatter(final_position[0], final_position[1], s=30, color="red", marker="o")
+    for eve in stone_list:
+        plt.scatter(eve[0], eve[1], s=30, color="black", marker="s")
+    if result != None:
+
+        for i in range(len(result) - 1):
+            plt.plot([result[i][0], result[i + 1][0]], [result[i][1], result[i + 1][1]], color="green", linestyle="--")
+        plt.savefig("QL_5-1.jpg", dpi=600)
+        plt.show()
+    else:
+        plt.savefig("grid.jpg", dpi=600)
+
+
+def action_result(action, current_state, max_trick):
+    if action == "up":
+        if current_state[1] == max_trick:
+            return current_state
+        else:
+            return (current_state[0], current_state[1]+1)
+    elif action == "down":
+        if current_state[1] == 0:
+            return current_state
+        else:
+            return (current_state[0], current_state[1]-1)
+    elif action == "left":
+        if current_state[0] == 0:
+            return current_state
+        else:
+            return (current_state[0]-1, current_state[1])
+    elif action == "right":
+        if current_state[0] == max_trick:
+            return current_state
+        else:
+            return (current_state[0]+1, current_state[1])
+    elif action == "left_up":
+        if current_state[0] == 0 or current_state[1] == max_trick:
+            return current_state
+        else:
+            return (current_state[0]-1,current_state[1]+1)
+    elif action == "left_down":
+        if current_state[0] == 0 or current_state[1] == 0:
+            return current_state
+        else:
+            return (current_state[0] - 1, current_state[1] - 1)
+    elif action == "right_up":
+        if current_state[0] == max_trick or current_state[1] == max_trick:
+            return current_state
+        else:
+            return (current_state[0] + 1, current_state[1] + 1)
+    elif action == "right_down":
+        if current_state[0] == max_trick or current_state[1] == 0:
+            return current_state
+        else:
+            return (current_state[0] + 1, current_state[1] - 1)
+    else:
+        raise IOError
+
+
+def get_area(area,successepisode,C_list):
+    c = 0
+    if (successepisode == 0):
+        area += 1
+    for i in C_list:
+        if i > 15:
+            c += 1
+    if c == len(C_list):
+        area += 1
+
+    return area
+
+
+def get_areareward(start_point,final_point,state,area):
+
+    ES = (final_point[0] - start_point[0], final_point[1] - start_point[1])
+    ES2 = ES[0] ** 2 + ES[1] ** 2
+
+    EP = (final_point[0] - state[0], final_point[1] - state[1])
+    EP2 = EP[0] ** 2 + EP[1] ** 2
+    ES_EP = ES[0] * EP[0] + ES[1] * EP[1]
+    ES_EP2 = ES_EP ** 2
+
+    distance = (EP2 - ES_EP2 / ES2)**0.5
+    if distance < area:
+        area_reward = 0
+    else:
+        area_reward = -10
+
+    return area_reward
+
+def get_reward(state,start_point,final_point, stonelist, currentstate,area):
+    areareward = get_areareward(start_point,final_point,state,area)
+    if state == currentstate:
+        return -3+areareward
+
+    if state == final_point:
+        return 10+areareward
+
+    elif state in stonelist:
+        return -10+areareward
+
+    else:
+        return -1+areareward
+
+def get_maxq(qtable, state):
+    temp = []
+    index = []
+    index_list = [0,1,2,3,4,5,6,7]
+
+    for j in range(len(matrix)):
+        if matrix[j][state[0]][state[1]] < 0:
+            index.append(j)
+
+    for m in range(len(index)):
+        index_list.remove(index[m])
+
+    for i in index_list:
+        temp.append(qtable[i][state[0]][state[1]])
+
+    maxone = max(temp)
+    arg = np.argmax(temp)
+    argmax = index_list[arg]
+    return maxone, argmax
+
+def get_randaction(current_matrix,state):
+    index02 = []
+    index_list02 = [0,1,2,3,4,5,6,7]
+
+    for i in range(len(index_list02)):
+        if current_matrix[i][state[0]][state[1]] < 0:
+            index02.append(i)
+
+    for j in range(len(index02)):
+        index_list02.remove(index02[j])
+
+    index = random.randint(0, len(index_list02) - 1)
+    actionindex = index_list02[index]
+
+    return actionindex
+
+def get_epsilon(fuction_epsilon0,function_episode,function_episodes):
+
+    if function_episode <= function_episodes*0.1854:
+        epsilon = fuction_epsilon0*(1-function_episode/(function_episodes*0.1854))**2
+    else:
+        epsilon = 0.01
+
+    return epsilon
+
+
+def stable_episode(current_episode,num1,num2):
+    for i in range(10):
+        num1 += Y[current_episode - i - 1]
+
+    av_reward10 = num1 / 10
+    for i in range(10):
+        num2 += (Y[current_episode - i - 1] - av_reward10) ** 2
+
+    standard_div_reward10 = (num2 / 10) ** 0.5
+
+    return standard_div_reward10
+
+def print_policy(policy_, stone_list, final_position):
+    with open('qlearning-policy.txt', "w", encoding="utf-8") as f:
+        for x in range(len(policy_)):
+            for y in range(len(policy_[x])):
+                if (x, y) in stone_list:
+                    print("({},{}):{}".format(x, y, "障碍物"), end="; ", file=f)
+                    print("({},{}):{}".format(x, y, "障碍物"), end="; ")
+                elif (x, y) == final_position:
+                    print("({},{}):{}".format(x, y, "终点"), end="; ", file=f)
+                    print("({},{}):{}".format(x, y, "终点"), end="; ")
+                else:
+                    print("({},{}):{}".format(x, y, action[policy_[x][y]]), end="; ", file=f)
+                    print("({},{}):{}".format(x, y, action[policy_[x][y]]), end="; ")
+            print("", file=f)
+            print("")
+
+
+if __name__ == "__main__":
+
+    n = 30
+    world = [[(i,j) for j in range(n)] for i in range(n)]
+
+    stone_list = [(0,5),(0,18),(1,4),(1,5),(1,12),(1,13),(1,17),(1,19),(1,24),(19,17),
+                  (2,6),(2,7),(2,12),(2,18),(2,24),(2,25),(3,1),(3,5),(3,6),(3,19),(3,24),
+                  (3,25),(3,26),(4,1),(4,2),(4,19),(4,20),(4,26),(4,27),(5,7),(5,8),(5,15),
+                  (5,16),(5,26),(6,1),(6,7),(6,21),(6,25),(7,0),(7,5),(7,7),(7,9),(7,11),
+                  (7,20),(7,21),(7,22),(7,23),(7,27),(7,28),(7,29),(8,1),(8,3),(8,4),(8,5),(8,23),
+                  (9,27),(8,29),(9,5),(9,9),(9,10),(9,23),(6,15),(5,14),(29,24),(29,23),(28,23),
+                  (9,28),(9,29),(11,2),(12,2),(12,1),(11,7),(11,8),(11,9),(12,8),(10,14),(11,14),
+                  (11,13),(10,18),(10,19),(10,20),(11,18),(11,19),(11,20),(11,21),(12,18),(12,19),
+                  (12,20),(11,25),(11,26),(12,26),(11,27),(14,4),(14,5),(14,6),(15,6),(16,6),(16,7),
+                  (17,6),(17,7),(15,12),(15,13),(16,12),(17,11),(17,12),(17,13),(17,19),(18,19),(18,20),
+                  (17,1),(18,1),(18,2),(16,28),(15,28),(25,27),(16,25),(16,24),(17,24),(17,25),
+                  (20,3),(21,3),(21,4),(21,5),(22,5),(23,5),(21,9),(21,10),(21,11),(22,9),
+                  (23,9),(23,10),(23,11),(19,10),(19,11),(19,15),(19,16),(19,28),(21,16),(22,16),(22,17),
+                  (22,21),(22,22),(22,28),(21,28),(21,27),(21,26),(23,26),(23,27),(23,28),(25,26),
+                  (25,25),(25,24),(26,25),(24,2),(24,3),(24,4),(25,2),(26,2),(25,7),(25,8),(25,9),(26,8),
+                  (24,14),(24,14),(24,13),(25,20),(25,21),(25,19),(26,19),(27,19),(28,1),(28,2),(29,2),
+                  (27,15),(27,14),(28,14),(28,15),(28,10),(29,10),(29,11),(29,9),(14,17),(14,16),(15,17),
+                  (23,21),(29,25),(15,14),
+                  ]
+    
+    start_position = (0, 0)     #起点
+    final_position = (29, 29)   #终点
+    plot_world(world, stone_list, start_position, final_position)
+
+    action = ["up", "down", "left", "right","left_up","left_down","right_up","right_down"]
+
+    q_table = [[[0 for j in range(len(world))] for i in range(len(world))] for k in range(len(action))]
+    policy = [[0 for j in range(len(world))] for i in range(len(world))]
+    matrix = [[[0 for j in range(len(world))] for i in range(len(world))] for k in range(len(action))]
+
+    episodes = 5000
+    alpha = 0.8
+    gamma = 0.5
+    epsilon0 = 0.3
+
+    success_episode = 0
+    Y = []
+
+    sum_reward_list = []
+
+
+    C = []
+    area = 1
+
+    count  = 0
+
+    time_begin = time.time()
+    print("开始时间：" + str(time_begin))
+
+    for episode in range(episodes):
+        current_state = start_position
+        save = [current_state]
+        reward_list = []
+
+        y_step = 0
+        corner = 0
+
+        actionindex = []
+
+        if (episode % 500 == 0):
+            area = get_area(area, success_episode, C)
+
+        sum_reward10 = 0
+        sum_reward102 = 0
+
+        if episode > 10:
+            stable = stable_episode(episode, sum_reward10, sum_reward102)
+            if stable < 4 and count == 0:
+                print("收敛回合：" + str(episode))
+                time_end = time.time()
+                print("结束时间：" + str(time_end))
+                count += 1
+
+        epsilon = get_epsilon(epsilon0, episode, episodes)
+        while True:
+            if random.randint(1,100)/100 > epsilon:
+                action_index = policy[current_state[0]][current_state[1]]
+            else:
+                action_index = get_randaction(matrix,current_state)
+
+            next_state = action_result(action[action_index], current_state, n-1)
+            reward = get_reward(next_state, start_position,final_position, stone_list, current_state,area)
+
+            maxone, _ = get_maxq(q_table, next_state)
+            q_table[action_index][current_state[0]][current_state[1]] +=alpha*(reward + gamma*maxone - q_table[action_index][current_state[0]][current_state[1]])
+
+            _, argmax = get_maxq(q_table, current_state)
+            policy[current_state[0]][current_state[1]] = argmax
+
+            if next_state == current_state:
+                y_step += 0
+            elif action_index in [0, 1, 2, 3]:
+                y_step += 1.00
+            elif action_index in [4, 5, 6, 7]:
+                y_step += 1.41
+
+            actionindex.append(action_index)
+
+            test_temp = current_state
+            current_state = next_state
+            save.append(current_state)
+            reward_list.append(reward)
+
+            if reward == -10 or reward == -20:
+                matrix[action_index][test_temp[0]][test_temp[1]] = -1
+
+            if reward == 10:
+                sum_reward = 0
+                for i in reward_list:
+                    sum_reward += i
+
+                sum_reward_list.append(sum_reward)
+
+                for i in range(len(actionindex) - 1):
+                    if actionindex[i + 1] != actionindex[i]:
+                        corner += 1
+
+                num = 0
+                for i in save:
+                    if i not in stone_list:
+                        num += 1
+                    if num == len(save):
+                        success_episode += 1
+                        C.append(corner)
+
+                Y.append(y_step)
+                break
+
+
+    time = time_end - time_begin
+    print("收敛时间：" + str(time))
+    E = []
+    E = list(range(1, episodes + 1))
+    plt.xlim([0, 2000])
+    plt.ylim([-5000, 500])
+    plt.title("reward--30*30*8--matrix02-reward3-e_model")
+    plt.xlabel("episodes")
+    plt.ylabel("reward")
+    plt.plot(E, sum_reward_list)
+    plt.savefig("reward-30-8--matrix02-reward3-e_model.png", dpi=600)
+    plt.show()
+
+    print("障碍物坐标：")
+    print(matrix)
+    font = {'family': 'Helvetica',
+            'weight': 'normal',
+            'size': 11,
+            }
+    plt.xlim([0,400])
+    plt.ylim([0, 500])
+    plt.xlabel("Episode", font)
+    plt.ylabel("The length of the path", font)
+    plt.plot(E, Y)
+    plt.savefig("fig5-5.jpg", dpi=600)
+    plt.show()
+
+
+
+    print(Y)
+    print("q_table:" + str(len(q_table)))
+    print(success_episode)
+    print(q_table)
+    print(C)
+    print("area：" + str(area))
+
+    sum = 0
+    for i in range(len(Y)):
+        sum += Y[i]
+    average_len = sum / len(Y)
+    print("平均路径长度为：" + str(average_len))
+
+    s2 = 0
+    for j in range(len(Y)):
+        s2 +=(Y[j]-average_len)**2
+    s = (s2/len(Y))**0.5
+    print("路径长度的平方根：")
+    print(s)
+
+    state = start_position
+    res = [state]
+    print("begin:", state, end=";")
+    for i in range(100):
+        a_index = policy[state[0]][state[1]]
+        next_state = action_result(action[a_index], state, n-1)
+        print(next_state, end=";")
+        res.append(next_state)
+        if next_state == final_position:
+            print("bingo!")
+            print("共走了",i+1,"步")
+            plot_world(world, stone_list, start_position, final_position,res)
+            print("使用q-learning训练并推理产生的结果图见根目录'qlearning-grid-result.png'")
+            print("使用q-learning训练并推理产生的策略已保存在'qlearning-policy.txt'")
+            print("q-learning策略：")
+            print_policy(policy, stone_list, final_position)
+            break
+        state = next_state
